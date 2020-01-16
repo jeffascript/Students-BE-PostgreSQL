@@ -25,7 +25,7 @@ router.get("/", async (req, res) => {
     i++; //increment the index
   }
 
-  if (sort) query += " ORDER BY Title " + (sort === "desc" ? "DESC" : "ASC");
+  if (sort) query += " ORDER BY _id " + (sort === "desc" ? "DESC" : "ASC");
 
   query += " LIMIT $1 OFFSET $2"; //closing up my query with limit and offset
   console.log(query);
@@ -50,16 +50,18 @@ router.get("/", async (req, res) => {
       return {
         oneStudent: p,
         searchById: `${req.protocol}://${req.get("host")}/students/${p._id}`,
+        searchByIdAndProjects: `${req.protocol}://${req.get("host")}/students/${p._id}/projects`,
         method: "GET"
       };
     });
 
     res.send({
       totalStudentsCount: students.rowCount,
-      students: allStudents,
       searchquery: `${req.protocol}://${req.get(
         "host"
-      )}/students/?ObjProp=ObjValue&sort=Desc||Asc&limit=NUMBER&offset=NUMBER`
+      )}/students/?objProp=objValue&sort=Desc||Asc&limit=NUMBER&offset=NUMBER`,
+      students: allStudents
+      
     });
   } catch (ex) {
     res.status(500).send(ex);
@@ -74,6 +76,9 @@ router.get("/search/:title", async (req, res) => {
   res.send(result.rows);
 });
 
+
+
+
 router.get("/:id", async (req, res) => {
   try {
     //$1 will be replaced with the first element into the array passed as second parameter, in this case Asin = req.params.asin
@@ -87,6 +92,33 @@ router.get("/:id", async (req, res) => {
     res.status(500).send(ex);
   }
 });
+
+// GET students/:id/projects => returns a list of projects in which also the info from the students appears (use JOIN to retrieve those info)
+
+router.get("/:id/projects", async (req, res) => {
+  try {
+    const students = await db.query(
+      `SELECT students._id,firstname,lastname,email,dob,projectname,description,createdat,repourl,liveurl   
+                                    FROM students LEFT JOIN projects ON students._id = projects.studentid
+
+  WHERE students._id = $1`,
+      [req.params.id]
+    );
+
+    if (students.rowCount === 0) {
+      res
+        .status(404)
+        .send(`The student with _id: ${req.params.id} NOT FOUND`);
+    } else {
+      res.send(students.rows);
+    }
+  } catch (error) {
+    console.log(error);
+  }
+});
+
+
+
 
 router.post("/", async (req, res) => {
   try {
@@ -109,7 +141,7 @@ router.post("/", async (req, res) => {
 // This route should contact students' table querying them by email, if length of resulting array is > 0 then check should fail.
 
 router.post("/checkEmail/", async(req,res)=>{
-   
+    
 
     try {
 
